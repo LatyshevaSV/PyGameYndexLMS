@@ -42,20 +42,20 @@ BLOCK_WIDTH, BLOCK_HEIGHT = 60, 20
 
 
 def reset_game():
-    global paddle, ball, ball_speed, blocks, playing, game_over
+    global paddle, ball, ball_speed, blocks, playing, game_over, score
     paddle = pygame.Rect(WIDTH // 2 - PADDLE_WIDTH // 2, HEIGHT - 30, PADDLE_WIDTH, PADDLE_HEIGHT)
     ball = pygame.Rect(WIDTH // 2, HEIGHT // 2, BALL_SIZE, BALL_SIZE)
     ball_speed = [4, -4]
-
-    # Блоки с фиксированными цветами
+    # Создаём блоки с фиксированными цветами
     blocks = []
     for x in range(10, WIDTH - 10, BLOCK_WIDTH + 10):
         for y in range(50, 200, BLOCK_HEIGHT + 10):
             block = pygame.Rect(x, y, BLOCK_WIDTH, BLOCK_HEIGHT)
-            color = random.choice(COLORS)  # Случайный цвет для блока
+            color = random.choice(COLORS)
             blocks.append((block, color))
     playing = False
     game_over = False
+    score = 0  # Сбрасываем счёт при перезапуске игры
 
 
 reset_game()
@@ -74,7 +74,6 @@ def draw_text(text, x, y, color=BLACK, font_type=font):
 
 # Главный игровой цикл
 while running:
-
     # Отрисовка фона
     screen.blit(background, (0, 0))
 
@@ -96,19 +95,19 @@ while running:
     if not playing and not game_over:
         background = pygame.image.load("fon.jpg")
         background = pygame.transform.scale(background, (WIDTH, HEIGHT))
-        draw_text("ARCANOID", WIDTH // 2, HEIGHT // 3)  # Центрированный текст
+        draw_text("ARCANOID", WIDTH // 2, HEIGHT // 3)
         pygame.draw.rect(screen, BLUE, start_button, border_radius=15)
-        draw_text("Старт", start_button.centerx, start_button.centery, WHITE)  # Центрированный текст на кнопке
+        draw_text("Старт", start_button.centerx, start_button.centery, WHITE)
     elif paused:
         draw_text("Пауза", WIDTH // 2, HEIGHT // 3)  # Центрированный текст
         pygame.draw.rect(screen, BLUE, resume_button, border_radius=15)
-        draw_text("Далее", resume_button.centerx, resume_button.centery, WHITE)  # Центрированный текст на кнопке
+        draw_text("Далее", resume_button.centerx, resume_button.centery, WHITE)
     elif game_over:
         background = pygame.image.load("finish.jpg")  # Смена картинки
         background = pygame.transform.scale(background, (WIDTH, HEIGHT))
         draw_text("GAME OVER", WIDTH // 2, HEIGHT // 3)  # Центрированный текст
-        pygame.draw.rect(screen, GREEN, back_button, border_radius=15)
-        draw_text("Назад", start_button.centerx, start_button.centery, BLACK)  # Центрированный текст на кнопке
+        pygame.draw.rect(screen, BLUE, back_button, border_radius=15)
+        draw_text("Назад", start_button.centerx, start_button.centery, WHITE)
     else:
         # Управление платформой мышью
         paddle.x = mouse_x - PADDLE_WIDTH // 2
@@ -128,8 +127,9 @@ while running:
         # Проверка столкновения с блоками
         for block, color in blocks[:]:
             if ball.colliderect(block):
-                blocks.remove((block, color))  # Удаление блока и его цвета (когда мяч сломал блок)
+                blocks.remove((block, color))
                 ball_speed[1] = -ball_speed[1]
+                score += 10  # Увеличиваем счёт на 10 за каждый разрушенный блок
                 break
 
         # Проверка проигрыша
@@ -141,7 +141,10 @@ while running:
         pygame.draw.rect(screen, BLUE, paddle)
         pygame.draw.ellipse(screen, RED, ball)
         for block, color in blocks:
-            pygame.draw.rect(screen, color, block)  # Отрисовка блока с фиксированным цветом
+            pygame.draw.rect(screen, color, block)  # Рисуем блок с фиксированным цветом
+
+        # Отображение счёта
+        draw_text(f"Счёт: {score}", WIDTH // 2, 20, WHITE)  # Отображаем счёт в верхней части экрана
 
         pygame.draw.rect(screen, BLUE, pause_button, border_radius=15)
         draw_text("Пауза", pause_button.centerx, pause_button.centery, WHITE, small_font)
@@ -149,5 +152,4 @@ while running:
     pygame.display.flip()
     pygame.time.delay(16)
 
-# Выход
 pygame.quit()
