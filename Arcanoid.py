@@ -40,13 +40,21 @@ BALL_SIZE = 10
 # Параметры блоков
 BLOCK_WIDTH, BLOCK_HEIGHT = 60, 20
 
+# Переменные игры
+level = 1
+score = 0
+playing = False
+game_over = False
+paused = False
+level_complete = False
+
 
 def reset_game():
     global paddle, ball, ball_speed, blocks, playing, game_over, score
     paddle = pygame.Rect(WIDTH // 2 - PADDLE_WIDTH // 2, HEIGHT - 30, PADDLE_WIDTH, PADDLE_HEIGHT)
     ball = pygame.Rect(WIDTH // 2, HEIGHT // 2, BALL_SIZE, BALL_SIZE)
     ball_speed = [4, -4]
-    # Создаём блоки с фиксированными цветами
+    # Создаём блоки с цветами
     blocks = []
     for x in range(10, WIDTH - 10, BLOCK_WIDTH + 10):
         for y in range(50, 200, BLOCK_HEIGHT + 10):
@@ -72,11 +80,53 @@ def draw_text(text, x, y, color=BLACK, font_type=font):
     screen.blit(img, text_rect)
 
 
-# Главный игровой цикл
-while running:
-    # Отрисовка фона
-    screen.blit(background, (0, 0))
+def create_blocks():
+    # Создаём блоки для уровня
+    blocks = []
+    for x in range(10, WIDTH - BLOCK_WIDTH - 10, BLOCK_WIDTH + 10):
+        for y in range(50, 200, BLOCK_HEIGHT + 10):
+            block = pygame.Rect(x, y, BLOCK_WIDTH, BLOCK_HEIGHT)
+            color = random.choice(COLORS)
+            blocks.append((block, color))
+    return blocks
 
+
+def create_walls(level):
+    # Создаём дополнительные препятствия на уровнях
+    walls = []
+    if level > 1:
+        for _ in range(level - 1):
+            x = random.randint(100, WIDTH - 100)
+            y = random.randint(250, 400)
+            walls.append(pygame.Rect(x, y, 80, 10))
+    return walls
+
+
+def reset_level():
+    global paddle, ball, ball_speed, blocks, walls, level_complete
+    paddle = pygame.Rect(WIDTH // 2 - PADDLE_WIDTH // 2, HEIGHT - 30, PADDLE_WIDTH, PADDLE_HEIGHT)
+    ball = pygame.Rect(WIDTH // 2, HEIGHT // 2, BALL_SIZE, BALL_SIZE)
+    ball_speed = [4, -4]
+    blocks = create_blocks()
+    walls = create_walls(level)
+    level_complete = False
+
+
+def reset_game():
+    global level, score, game_over, playing
+    level = 1
+    score = 0
+    game_over = False
+    playing = False
+    reset_level()
+
+
+reset_game()
+
+# Главный игровой цикл
+running = True
+while running:
+    screen.fill(WHITE)
     mouse_x, _ = pygame.mouse.get_pos()
 
     for event in pygame.event.get():
@@ -87,6 +137,10 @@ while running:
                 playing = True
             elif game_over and start_button.collidepoint(event.pos):
                 reset_game()
+            elif level_complete and resume_button.collidepoint(event.pos):
+                level += 1
+                reset_level()
+                playing = True
             elif paused and resume_button.collidepoint(event.pos):
                 paused = False
             elif playing and pause_button.collidepoint(event.pos):
@@ -99,24 +153,24 @@ while running:
         pygame.draw.rect(screen, BLUE, start_button, border_radius=15)
         draw_text("Старт", start_button.centerx, start_button.centery, WHITE)
     elif paused:
-        draw_text("Пауза", WIDTH // 2, HEIGHT // 3)  # Центрированный текст
+        draw_text("Пауза", WIDTH // 2, HEIGHT // 3)
+        pygame.draw.rect(screen, BLUE, resume_button, border_radius=15)
+        draw_text("Далее", resume_button.centerx, resume_button.centery, WHITE)
+    elif level_complete:
+        draw_text(f"Уровень {level} пройден!", WIDTH // 2, HEIGHT // 3, GREEN)
         pygame.draw.rect(screen, BLUE, resume_button, border_radius=15)
         draw_text("Далее", resume_button.centerx, resume_button.centery, WHITE)
     elif game_over:
-        background = pygame.image.load("finish.jpg")  # Смена картинки
+        background = pygame.image.load("finish.jpg")
         background = pygame.transform.scale(background, (WIDTH, HEIGHT))
-        draw_text("GAME OVER", WIDTH // 2, HEIGHT // 3)  # Центрированный текст
+        draw_text("GAME OVER", WIDTH // 2, HEIGHT // 3)
+        draw_text(f"Счёт: {score}", WIDTH // 2, HEIGHT // 2, BLACK)
         pygame.draw.rect(screen, BLUE, back_button, border_radius=15)
         draw_text("Назад", start_button.centerx, start_button.centery, WHITE)
-    else:
-        # Управление платформой мышью
-        paddle.x = mouse_x - PADDLE_WIDTH // 2
-        paddle.x = max(0, min(WIDTH - PADDLE_WIDTH, paddle.x))
-
-        # Движение мяча
+    elif playing:
+        paddle.x = max(0, min(WIDTH - PADDLE_WIDTH, mouse_x - PADDLE_WIDTH // 2))
         ball.move_ip(*ball_speed)
 
-        # Отскоки
         if ball.left <= 0 or ball.right >= WIDTH:
             ball_speed[0] = -ball_speed[0]
         if ball.top <= 0:
@@ -124,27 +178,37 @@ while running:
         if ball.colliderect(paddle) and ball_speed[1] > 0:
             ball_speed[1] = -ball_speed[1]
 
-        # Проверка столкновения с блоками
         for block, color in blocks[:]:
             if ball.colliderect(block):
                 blocks.remove((block, color))
                 ball_speed[1] = -ball_speed[1]
-                score += 10  # Увеличиваем счёт на 10 за каждый разрушенный блок
+                score += 10
                 break
 
-        # Проверка проигрыша
+        for wall in walls:
+            if ball.colliderect(wall):
+                ball_speed[1] = -ball_speed[1]
+                break
+
         if ball.bottom >= HEIGHT:
             game_over = True
             playing = False
+        if not blocks:
+            level_complete = True
+            playing = False
 
-        # Отрисовка
         pygame.draw.rect(screen, BLUE, paddle)
         pygame.draw.ellipse(screen, RED, ball)
         for block, color in blocks:
-            pygame.draw.rect(screen, color, block)  # Рисуем блок с фиксированным цветом
+            pygame.draw.rect(screen, color, block)
+        for wall in walls:
+            pygame.draw.rect(screen, BLACK, wall)
+
+        draw_text(f"Счёт: {score}", WIDTH // 2, 20, BLACK)
+        draw_text(f"Уровень: {level}", WIDTH - 100, 20, BLACK)
 
         # Отображение счёта
-        draw_text(f"Счёт: {score}", WIDTH // 2, 20, WHITE)  # Отображаем счёт в верхней части экрана
+        draw_text(f"Счёт: {score}", WIDTH // 2, 20, WHITE)
 
         pygame.draw.rect(screen, BLUE, pause_button, border_radius=15)
         draw_text("Пауза", pause_button.centerx, pause_button.centery, WHITE, small_font)
