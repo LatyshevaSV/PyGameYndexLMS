@@ -10,14 +10,18 @@ WIDTH, HEIGHT = 800, 600
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
 pygame.display.set_caption("Арканоид")
 
-# Загрузка фона
+# Загрузка фонов
 try:
     background = pygame.image.load(os.path.join("fon.jpg"))
     background = pygame.transform.scale(background, (WIDTH, HEIGHT))
+    level_complete_background = pygame.image.load(os.path.join("complete.jpg"))
+    level_complete_background = pygame.transform.scale(level_complete_background, (WIDTH, HEIGHT))
 except pygame.error as e:
     print(f"Ошибка загрузки фонового изображения: {e}")
     background = pygame.Surface((WIDTH, HEIGHT))
     background.fill((255, 255, 255))  # Белый фон, если изображение не загружено
+    level_complete_background = pygame.Surface((WIDTH, HEIGHT))
+    level_complete_background.fill((0, 255, 0))  # Зелёный фон для завершения уровня
 
 # Цвета
 WHITE = (255, 255, 255)
@@ -87,7 +91,7 @@ def draw_text(text, x, y, color=BLACK, font_type=font):
 
 
 def create_blocks():
-    # Создаём блоки для уровня без выхода за экран
+    # Создаём блоки для уровня
     blocks = []
     for x in range(10, WIDTH - BLOCK_WIDTH - 10, BLOCK_WIDTH + 10):
         for y in range(50, 200, BLOCK_HEIGHT + 10):
@@ -132,7 +136,7 @@ reset_game()
 # Главный игровой цикл
 running = True
 while running:
-    screen.blit(background, (0, 0))
+    screen.blit(background, (0, 0))  # По умолчанию используем основной фон
     mouse_x, _ = pygame.mouse.get_pos()
 
     for event in pygame.event.get():
@@ -141,7 +145,7 @@ while running:
         if event.type == pygame.MOUSEBUTTONDOWN:
             if not playing and not game_over and start_button.collidepoint(event.pos):
                 playing = True
-            elif game_over and back_button.collidepoint(event.pos):  # Исправлено на back_button
+            elif game_over and back_button.collidepoint(event.pos):
                 reset_game()
             elif level_complete and resume_button.collidepoint(event.pos):
                 level += 1
@@ -152,27 +156,23 @@ while running:
             elif playing and pause_button.collidepoint(event.pos):
                 paused = True
 
+    # Основное окно
     if not playing and not game_over:
-        # Загрузка фона уровня
-        try:
-            background = pygame.image.load(os.path.join("fon.jpg"))
-            background = pygame.transform.scale(background, (WIDTH, HEIGHT))
-        except pygame.error as e:
-            print(f"Ошибка загрузки фонового изображения: {e}")
-            background = pygame.Surface((WIDTH, HEIGHT))
-            background.fill((255, 255, 255))  # Белый фон, если изображение не загружено
-        screen.blit(background, (0, 0))
         draw_text("ARCANOID", WIDTH // 2, HEIGHT // 3)
         pygame.draw.rect(screen, BLUE, start_button, border_radius=15)
         draw_text("Старт", start_button.centerx, start_button.centery, WHITE)
+    # Пауза
     elif paused:
         draw_text("Пауза", WIDTH // 2, HEIGHT // 3)
         pygame.draw.rect(screen, BLUE, resume_button, border_radius=15)
         draw_text("Далее", resume_button.centerx, resume_button.centery, WHITE)
+    # Уровень пройден
     elif level_complete:
+        screen.blit(level_complete_background, (0, 0))  # Используем фон для завершения уровня (отличный от основного)
         draw_text(f"Уровень {level} пройден!", WIDTH // 2, HEIGHT // 3, WHITE)
         pygame.draw.rect(screen, BLUE, resume_button, border_radius=15)
         draw_text("Далее", resume_button.centerx, resume_button.centery, WHITE)
+    # Конец игры
     elif game_over:
         try:
             game_over_background = pygame.image.load(os.path.join("finish.jpg"))
@@ -180,11 +180,12 @@ while running:
             screen.blit(game_over_background, (0, 0))
         except pygame.error as e:
             print(f"Ошибка загрузки фонового изображения: {e}")
-            screen.fill(BLACK)
+            screen.fill(WHITE)
         draw_text("GAME OVER", WIDTH // 2, HEIGHT // 3)
         draw_text(f"Счёт: {score}", WIDTH // 2, HEIGHT // 2, BLACK)
         pygame.draw.rect(screen, BLUE, back_button, border_radius=15)
         draw_text("Назад", back_button.centerx, back_button.centery, WHITE)
+    # Игра
     elif playing:
         paddle.x = max(0, min(WIDTH - PADDLE_WIDTH, mouse_x - PADDLE_WIDTH // 2))
         ball.move_ip(*ball_speed)
@@ -196,6 +197,7 @@ while running:
         if ball.colliderect(paddle) and ball_speed[1] > 0:
             ball_speed[1] = -ball_speed[1]
 
+        # Блоки и их удаление
         for block, color in blocks[:]:
             if ball.colliderect(block):
                 blocks.remove((block, color))
@@ -203,6 +205,7 @@ while running:
                 score += 10
                 break
 
+        # Работа стенок
         for wall in walls:
             if ball.colliderect(wall):
                 ball_speed[1] = -ball_speed[1]
@@ -222,6 +225,7 @@ while running:
         for wall in walls:
             pygame.draw.rect(screen, BLACK, wall)
 
+        # Отображение паузы, счёта и уровня на игровом экране
         draw_text(f"Счёт: {score}", WIDTH // 2, 20, WHITE)
         draw_text(f"Уровень: {level}", 100, 20, WHITE)
 
@@ -231,4 +235,5 @@ while running:
     pygame.display.flip()
     pygame.time.delay(16)
 
+# Выход из игры
 pygame.quit()
