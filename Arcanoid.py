@@ -39,11 +39,11 @@ small_font = pygame.font.Font(None, 30)
 # Кнопки
 start_button = pygame.Rect(WIDTH // 2 - 75, HEIGHT // 2 - 25, 150, 50)
 back_button = pygame.Rect(WIDTH // 2 - 75, HEIGHT // 2 + 50, 150, 50)
-pause_button = pygame.Rect(WIDTH - 120, 10, 100, 30)  # Перемещена вверх
+pause_button = pygame.Rect(WIDTH - 120, 10, 100, 30)
 resume_button = pygame.Rect(WIDTH // 2 - 75, HEIGHT // 2, 150, 50)
 restart_button = pygame.Rect(WIDTH // 2 - 75, HEIGHT // 2 + 100, 150, 50)
 exit_button = pygame.Rect(WIDTH // 2 - 75, HEIGHT // 2 + 150, 150, 50)
-rename_button = pygame.Rect(WIDTH // 2 - 75, HEIGHT // 2 + 200, 150, 50)  # Стандартный размер
+rename_button = pygame.Rect(WIDTH // 2 - 75, HEIGHT // 2 + 200, 150, 50)
 delete_button = pygame.Rect(WIDTH // 2 - 75, HEIGHT // 2 + 250, 150, 50)
 exit_to_menu_button = pygame.Rect(WIDTH // 2 - 75, HEIGHT // 2 + 50, 150, 50)
 
