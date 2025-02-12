@@ -1,6 +1,7 @@
 import pygame
 import random
 import os
+import json
 
 # Инициализация Pygame
 pygame.init()
@@ -38,8 +39,13 @@ small_font = pygame.font.Font(None, 30)
 # Кнопки
 start_button = pygame.Rect(WIDTH // 2 - 75, HEIGHT // 2 - 25, 150, 50)
 back_button = pygame.Rect(WIDTH // 2 - 75, HEIGHT // 2 + 50, 150, 50)
-pause_button = pygame.Rect(WIDTH - 120, 10, 100, 30)
+pause_button = pygame.Rect(WIDTH - 120, 10, 100, 30)  # Перемещена вверх
 resume_button = pygame.Rect(WIDTH // 2 - 75, HEIGHT // 2, 150, 50)
+restart_button = pygame.Rect(WIDTH // 2 - 75, HEIGHT // 2 + 100, 150, 50)
+exit_button = pygame.Rect(WIDTH // 2 - 75, HEIGHT // 2 + 150, 150, 50)
+rename_button = pygame.Rect(WIDTH // 2 - 75, HEIGHT // 2 + 200, 150, 50)  # Стандартный размер
+delete_button = pygame.Rect(WIDTH // 2 - 75, HEIGHT // 2 + 250, 150, 50)
+exit_to_menu_button = pygame.Rect(WIDTH // 2 - 75, HEIGHT // 2 + 50, 150, 50)
 
 # Параметры платформы
 PADDLE_WIDTH, PADDLE_HEIGHT = 100, 10
@@ -58,13 +64,71 @@ game_over = False
 paused = False
 level_complete = False
 
+# Функции для работы с профилями
+PROFILES_DIR = "profiles"
+
+
+def ensure_profiles_dir():
+    if not os.path.exists(PROFILES_DIR):
+        os.makedirs(PROFILES_DIR)
+
+
+def save_profile(profile_name, score):
+    ensure_profiles_dir()
+    profile_path = os.path.join(PROFILES_DIR, f"{profile_name}.json")
+    if os.path.exists(profile_path):
+        with open(profile_path, 'r') as file:
+            data = json.load(file)
+        if score > data.get("max_score", 0):
+            data["max_score"] = score
+    else:
+        data = {"max_score": score}
+    with open(profile_path, 'w') as file:
+        json.dump(data, file)
+
+
+def load_profile(profile_name):
+    profile_path = os.path.join(PROFILES_DIR, f"{profile_name}.json")
+    if os.path.exists(profile_path):
+        with open(profile_path, 'r') as file:
+            data = json.load(file)
+        return data.get("max_score", 0)
+    return 0
+
+
+def list_profiles():
+    ensure_profiles_dir()
+    return [f.replace(".json", "") for f in os.listdir(PROFILES_DIR) if f.endswith(".json")]
+
+
+def rename_profile(old_name, new_name):
+    ensure_profiles_dir()
+    old_path = os.path.join(PROFILES_DIR, f"{old_name}.json")
+    new_path = os.path.join(PROFILES_DIR, f"{new_name}.json")
+    if os.path.exists(old_path):
+        os.rename(old_path, new_path)
+
+
+def delete_profile(profile_name):
+    ensure_profiles_dir()
+    profile_path = os.path.join(PROFILES_DIR, f"{profile_name}.json")
+    if os.path.exists(profile_path):
+        os.remove(profile_path)
+
+
+# Инициализация профилей
+current_profile = None
+profiles = list_profiles()
+profile_selection = True
+renaming = False
+new_profile_name = ""
+
 
 def reset_game():
     global paddle, ball, ball_speed, blocks, playing, game_over, score
     paddle = pygame.Rect(WIDTH // 2 - PADDLE_WIDTH // 2, HEIGHT - 30, PADDLE_WIDTH, PADDLE_HEIGHT)
     ball = pygame.Rect(WIDTH // 2, HEIGHT // 2, BALL_SIZE, BALL_SIZE)
     ball_speed = [4, -4]
-    # Создаём блоки с фиксированными цветами
     blocks = []
     for x in range(10, WIDTH - 10, BLOCK_WIDTH + 10):
         for y in range(50, 200, BLOCK_HEIGHT + 10):
@@ -73,14 +137,10 @@ def reset_game():
             blocks.append((block, color))
     playing = False
     game_over = False
-    score = 0  # Сбрасываем счёт при перезапуске игры
+    score = 0
 
 
 reset_game()
-
-# Флаги состояний
-running = True
-paused = False
 
 
 # Функция отображения текста
@@ -90,8 +150,8 @@ def draw_text(text, x, y, color=BLACK, font_type=font):
     screen.blit(img, text_rect)
 
 
+# Создание блоков
 def create_blocks():
-    # Создаём блоки для уровня
     blocks = []
     for x in range(10, WIDTH - BLOCK_WIDTH - 10, BLOCK_WIDTH + 10):
         for y in range(50, 200, BLOCK_HEIGHT + 10):
@@ -101,8 +161,8 @@ def create_blocks():
     return blocks
 
 
+# Создание стенок
 def create_walls(level):
-    # Создаём дополнительные препятствия на уровнях
     walls = []
     if level > 1:
         for _ in range(level - 1):
@@ -122,6 +182,7 @@ def reset_level():
     level_complete = False
 
 
+# Работа с уровнями
 def reset_game():
     global level, score, game_over, playing
     level = 1
@@ -136,14 +197,33 @@ reset_game()
 # Главный игровой цикл
 running = True
 while running:
-    screen.blit(background, (0, 0))  # По умолчанию используем основной фон
+    screen.blit(background, (0, 0))
     mouse_x, _ = pygame.mouse.get_pos()
 
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             running = False
         if event.type == pygame.MOUSEBUTTONDOWN:
-            if not playing and not game_over and start_button.collidepoint(event.pos):
+            if profile_selection:
+                for i, profile in enumerate(profiles):
+                    profile_rect = pygame.Rect(WIDTH // 2 - 75, 150 + i * 60, 150, 50)
+                    if profile_rect.collidepoint(event.pos):
+                        current_profile = profile
+                        profile_selection = False
+                new_profile_rect = pygame.Rect(WIDTH // 2 - 75, 150 + len(profiles) * 60, 150, 50)
+                if new_profile_rect.collidepoint(event.pos):
+                    renaming = True
+                    new_profile_name = ""
+                rename_rect = pygame.Rect(WIDTH // 2 - 75, 150 + (len(profiles) + 1) * 60, 150, 50)
+                if rename_rect.collidepoint(event.pos) and current_profile:
+                    renaming = True
+                    new_profile_name = current_profile
+                delete_rect = pygame.Rect(WIDTH // 2 - 75, 150 + (len(profiles) + 2) * 60, 150, 50)
+                if delete_rect.collidepoint(event.pos) and current_profile:
+                    delete_profile(current_profile)
+                    profiles = list_profiles()
+                    current_profile = None
+            elif not playing and not game_over and start_button.collidepoint(event.pos):
                 playing = True
             elif game_over and back_button.collidepoint(event.pos):
                 reset_game()
@@ -153,26 +233,70 @@ while running:
                 playing = True
             elif paused and resume_button.collidepoint(event.pos):
                 paused = False
+            elif paused and exit_to_menu_button.collidepoint(event.pos):
+                profile_selection = True
+                paused = False
+                playing = False
+                game_over = False
+                level_complete = False
+                reset_game()
             elif playing and pause_button.collidepoint(event.pos):
                 paused = True
+            elif game_over and restart_button.collidepoint(event.pos):
+                reset_game()
+                playing = True
+            elif game_over and exit_button.collidepoint(event.pos):
+                running = False
+        if event.type == pygame.KEYDOWN:
+            if renaming:
+                if event.key == pygame.K_RETURN:
+                    if new_profile_name:
+                        if current_profile:
+                            rename_profile(current_profile, new_profile_name)
+                            current_profile = new_profile_name
+                        else:
+                            save_profile(new_profile_name, 0)
+                            current_profile = new_profile_name
+                        profiles = list_profiles()
+                        renaming = False
+                elif event.key == pygame.K_BACKSPACE:
+                    new_profile_name = new_profile_name[:-1]
+                else:
+                    new_profile_name += event.unicode
 
-    # Основное окно
-    if not playing and not game_over:
+    if profile_selection:
+        draw_text("Выберите профиль", WIDTH // 2, 100)
+        for i, profile in enumerate(profiles):
+            profile_rect = pygame.Rect(WIDTH // 2 - 75, 150 + i * 60, 150, 50)
+            pygame.draw.rect(screen, BLUE, profile_rect, border_radius=15)
+            draw_text(profile, profile_rect.centerx, profile_rect.centery, WHITE)
+        new_profile_rect = pygame.Rect(WIDTH // 2 - 75, 150 + len(profiles) * 60, 150, 50)
+        pygame.draw.rect(screen, GREEN, new_profile_rect, border_radius=15)
+        draw_text("Новый", new_profile_rect.centerx, new_profile_rect.centery, WHITE)
+        if current_profile:
+            rename_rect = pygame.Rect(WIDTH // 2 - 75, 150 + (len(profiles) + 1) * 60, 150, 50)
+            pygame.draw.rect(screen, BLUE, rename_rect, border_radius=15)
+            draw_text("Переименовать", rename_rect.centerx, rename_rect.centery, WHITE, small_font)
+            delete_rect = pygame.Rect(WIDTH // 2 - 75, 150 + (len(profiles) + 2) * 60, 150, 50)
+            pygame.draw.rect(screen, RED, delete_rect, border_radius=15)
+            draw_text("Удалить", delete_rect.centerx, delete_rect.centery, WHITE)
+        if renaming:
+            draw_text(f"Имя: {new_profile_name}", WIDTH // 2, HEIGHT - 100, BLACK)
+    elif not playing and not game_over:
         draw_text("ARCANOID", WIDTH // 2, HEIGHT // 3)
         pygame.draw.rect(screen, BLUE, start_button, border_radius=15)
         draw_text("Старт", start_button.centerx, start_button.centery, WHITE)
-    # Пауза
     elif paused:
         draw_text("Пауза", WIDTH // 2, HEIGHT // 3)
         pygame.draw.rect(screen, BLUE, resume_button, border_radius=15)
         draw_text("Далее", resume_button.centerx, resume_button.centery, WHITE)
-    # Уровень пройден
+        pygame.draw.rect(screen, BLUE, exit_to_menu_button, border_radius=15)
+        draw_text("В меню", exit_to_menu_button.centerx, exit_to_menu_button.centery, WHITE)
     elif level_complete:
-        screen.blit(level_complete_background, (0, 0))  # Используем фон для завершения уровня (отличный от основного)
+        screen.blit(level_complete_background, (0, 0))
         draw_text(f"Уровень {level} пройден!", WIDTH // 2, HEIGHT // 3, WHITE)
         pygame.draw.rect(screen, BLUE, resume_button, border_radius=15)
         draw_text("Далее", resume_button.centerx, resume_button.centery, WHITE)
-    # Конец игры
     elif game_over:
         try:
             game_over_background = pygame.image.load(os.path.join("finish.jpg"))
@@ -185,7 +309,11 @@ while running:
         draw_text(f"Счёт: {score}", WIDTH // 2, HEIGHT // 2, BLACK)
         pygame.draw.rect(screen, BLUE, back_button, border_radius=15)
         draw_text("Назад", back_button.centerx, back_button.centery, WHITE)
-    # Игра
+        pygame.draw.rect(screen, BLUE, restart_button, border_radius=15)
+        draw_text("Рестарт", restart_button.centerx, restart_button.centery, WHITE)
+        pygame.draw.rect(screen, BLUE, exit_button, border_radius=15)
+        draw_text("Выход", exit_button.centerx, exit_button.centery, WHITE)
+        save_profile(current_profile, score)
     elif playing:
         paddle.x = max(0, min(WIDTH - PADDLE_WIDTH, mouse_x - PADDLE_WIDTH // 2))
         ball.move_ip(*ball_speed)
@@ -197,7 +325,6 @@ while running:
         if ball.colliderect(paddle) and ball_speed[1] > 0:
             ball_speed[1] = -ball_speed[1]
 
-        # Блоки и их удаление
         for block, color in blocks[:]:
             if ball.colliderect(block):
                 blocks.remove((block, color))
@@ -205,7 +332,6 @@ while running:
                 score += 10
                 break
 
-        # Работа стенок
         for wall in walls:
             if ball.colliderect(wall):
                 ball_speed[1] = -ball_speed[1]
@@ -225,9 +351,9 @@ while running:
         for wall in walls:
             pygame.draw.rect(screen, BLACK, wall)
 
-        # Отображение паузы, счёта и уровня на игровом экране
         draw_text(f"Счёт: {score}", WIDTH // 2, 20, WHITE)
         draw_text(f"Уровень: {level}", 100, 20, WHITE)
+        draw_text(f"{current_profile}", WIDTH - 150, 20, WHITE, small_font)
 
         pygame.draw.rect(screen, BLUE, pause_button, border_radius=15)
         draw_text("Пауза", pause_button.centerx, pause_button.centery, WHITE, small_font)
@@ -235,5 +361,4 @@ while running:
     pygame.display.flip()
     pygame.time.delay(16)
 
-# Выход из игры
 pygame.quit()
